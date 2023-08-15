@@ -308,12 +308,65 @@ class APIClient:
             requests.exceptions.Timeout: If the request times out.
             requests.exceptions.ConnectionError: If a network error occurs.
         """
-        resp = self.__request(
+
+        return (
+            self.__create_upload_self_hosted_storage(file_name, num_bytes)
+            if os.getenv("AP_AGENT_STORAGE_ZONE_SLUG")
+            else self.__create_upload_airplane_storage(file_name, num_bytes)
+        )
+
+    def __create_upload_airplane_storage(
+        self, file_name: str, num_bytes: int
+    ) -> Dict[str, Any]:
+        return self.__request(
             "POST",
             "/v0/uploads/create",
             body={"fileName": file_name, "sizeBytes": num_bytes},
         )
-        return resp
+
+    def __create_upload_self_hosted_storage(
+        self, file_name: str, num_bytes: int
+    ) -> Dict[str, Any]:
+        # Find the zone to create the upload in.
+        pick_zone_resp = self.__request(
+            "GET",
+            "/v0/inputs/pickZone",
+            params={
+                "taskRevisionID": os.getenv("AIRPLANE_TASK_REVISION_ID"),
+            },
+        )
+        if "zone" not in pick_zone_resp or pick_zone_resp["zone"] is None:
+            return self.__create_upload_airplane_storage(file_name, num_bytes)
+        zone = pick_zone_resp["zone"]
+
+        # Create the upload via the agent.
+        agent_upload_resp = self.__request(
+            "POST",
+            "/v0/dp/uploads/create",
+            body={"fileName": file_name, "sizeBytes": num_bytes},
+            extra_headers={"X-Airplane-Dataplane-Token": zone["accessToken"]},
+            host=zone["dataPlaneURL"],
+        )
+        upload = agent_upload_resp["upload"]
+
+        # Create the upload in the Airplane api.
+        airplane_upload_resp = self.__request(
+            "POST",
+            "/v0/uploads/create",
+            body={
+                "fileName": file_name,
+                "sizeBytes": num_bytes,
+                "zoneID": zone["id"],
+                "zoneToken": upload["zoneToken"],
+            },
+        )
+
+        # Return the upload from Airplane and the urls from the agent.
+        return {
+            "upload": airplane_upload_resp["upload"],
+            "readOnlyURL": agent_upload_resp["readOnlyURL"],
+            "writeOnlyURL": agent_upload_resp["writeOnlyURL"],
+        }
 
     def create_table_display(
         self,
