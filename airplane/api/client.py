@@ -18,7 +18,7 @@ from airplane.exceptions import (
     InvalidEnvironmentException,
     InvalidZoneException,
 )
-from airplane.params import ParamTypes, SerializedParam, serialize_param
+from airplane.params import ParamDefTypes, ParamTypes, SerializedParam, serialize_param
 from airplane.types import File, JSONType
 
 
@@ -103,19 +103,82 @@ class APIClient:
             requests.exceptions.Timeout: If the request times out.
             requests.exceptions.ConnectionError: If a network error occurs.
         """
-        serialized_params = {}
-        for key, val in (param_values or {}).items():
-            serialized_params[key] = serialize_param(val)
+
+        serialized_params = {
+            key: serialize_param(val) for key, val in (param_values or {}).items()
+        }
+
+        return (
+            self.__execute_task_self_hosted_storage(
+                slug, serialized_params, resources or {}
+            )
+            if os.getenv("AP_AGENT_STORAGE_ZONE_SLUG")
+            else self.__execute_task_airplane(slug, serialized_params, resources or {})
+        )
+
+    def __execute_task_airplane(
+        self,
+        slug: str,
+        serialized_param_values: Dict[str, ParamDefTypes],
+        resources: Dict[str, str],
+    ) -> str:
         resp = self.__request(
             "POST",
             "/v0/tasks/execute",
             body={
                 "slug": slug,
-                "paramValues": serialized_params,
-                "resources": resources or {},
+                "paramValues": serialized_param_values,
+                "resources": resources,
             },
         )
         return resp["runID"]
+
+    def __execute_task_self_hosted_storage(
+        self,
+        slug: str,
+        serialized_param_values: Dict[str, ParamDefTypes],
+        resources: Dict[str, str],
+    ) -> str:
+        pick_zone_resp = self.__pick_zone()
+        if "zone" not in pick_zone_resp or not pick_zone_resp["zone"]:
+            return self.__execute_task_airplane(
+                slug, serialized_param_values, resources
+            )
+        zone = pick_zone_resp["zone"]
+
+        # Create the inputs via the agent.
+        agent_resp = self.__request(
+            "POST",
+            "/v0/dp/inputs/create",
+            body={
+                "paramValues": serialized_param_values,
+                "constraintParams": pick_zone_resp["constraintParams"],
+            },
+            extra_headers={"X-Airplane-Dataplane-Token": zone["accessToken"]},
+            host=zone["dataPlaneURL"],
+        )
+
+        # Create the run in the Airplane api.
+        airplane_resp = self.__request(
+            "POST",
+            "/v0/tasks/execute",
+            body={
+                "slug": slug,
+                "paramValues": {
+                    # TODO: this substitution conditional is temporary
+                    key: (
+                        val
+                        if key not in pick_zone_resp["constraintParams"]
+                        else serialized_param_values[key]
+                    )
+                    for key, val in agent_resp["substitutions"].items()
+                },
+                "resources": resources or {},
+                "inputsZoneID": zone["id"],
+                "inputsZoneToken": agent_resp["token"],
+            },
+        )
+        return airplane_resp["runID"]
 
     def get_run(self, run_id: str) -> Dict[str, Any]:
         """Fetches an Airplane run.
@@ -328,14 +391,8 @@ class APIClient:
         self, file_name: str, num_bytes: int
     ) -> Dict[str, Any]:
         # Find the zone to create the upload in.
-        pick_zone_resp = self.__request(
-            "GET",
-            "/v0/inputs/pickZone",
-            params={
-                "taskRevisionID": os.getenv("AIRPLANE_TASK_REVISION_ID"),
-            },
-        )
-        if "zone" not in pick_zone_resp or pick_zone_resp["zone"] is None:
+        pick_zone_resp = self.__pick_zone()
+        if "zone" not in pick_zone_resp or not pick_zone_resp["zone"]:
             return self.__create_upload_airplane_storage(file_name, num_bytes)
         zone = pick_zone_resp["zone"]
 
@@ -367,6 +424,15 @@ class APIClient:
             "readOnlyURL": agent_upload_resp["readOnlyURL"],
             "writeOnlyURL": agent_upload_resp["writeOnlyURL"],
         }
+
+    def __pick_zone(self) -> Dict[str, Any]:
+        return self.__request(
+            "GET",
+            "/v0/inputs/pickZone",
+            params={
+                "taskRevisionID": os.getenv("AIRPLANE_TASK_REVISION_ID"),
+            },
+        )
 
     def create_table_display(
         self,
