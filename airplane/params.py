@@ -10,6 +10,10 @@ from airplane.types import JSON, SQL, ConfigVar, File, LongText
 
 SERIALIZED_DATE_FORMAT = "%Y-%m-%d"
 SERIALIZED_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
+# Use %z when deserializing from a string that includes a timezone.
+SERIALIZED_DATETIME_FORMAT_WITH_TIMEZONE = "%Y-%m-%dT%H:%M:%S%z"
+
 SERIALIZED_DATETIME_MILLISECONDS_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 

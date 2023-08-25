@@ -19,7 +19,7 @@ from airplane.exceptions import (
 )
 from airplane.params import (
     SERIALIZED_DATE_FORMAT,
-    SERIALIZED_DATETIME_FORMAT,
+    SERIALIZED_DATETIME_FORMAT_WITH_TIMEZONE,
     SERIALIZED_DATETIME_MILLISECONDS_FORMAT,
     ParamConfig,
     ParamDefOptions,
@@ -535,7 +535,7 @@ def _convert_task_param(param: ParamDef, value: Any) -> Any:
             value,
             SERIALIZED_DATETIME_MILLISECONDS_FORMAT
             if "." in value
-            else SERIALIZED_DATETIME_FORMAT,
+            else SERIALIZED_DATETIME_FORMAT_WITH_TIMEZONE,
         )
     if param.type == "upload":
         value = File(

@@ -1,14 +1,17 @@
+import datetime
 import sys
 from typing import Any, List, Optional, Union
 
 import pytest
 from typing_extensions import Annotated
 
+from airplane.config import ParamDef, _convert_task_param
 from airplane.exceptions import InvalidAnnotationException
 from airplane.params import (
     ParamConfig,
     ParamInfo,
     resolve_type,
+    serialize_param,
     to_airplane_type,
     to_serialized_airplane_type,
 )
@@ -215,3 +218,32 @@ def test_python_uniontype_optional() -> None:
     )
     assert info.is_optional
     assert info.resolved_type == str
+
+
+def test_datetime_timezones() -> None:
+    """
+    Test that a datetime object with timezone is serialized and unserialized correctly.
+    """
+    dt = datetime.datetime(2022, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
+    assert dt.tzinfo is not None
+    serialized_dt = serialize_param(dt)
+    # The string should have the UTC timezone
+    assert serialized_dt == "2022-01-01T12:00:00Z"
+    # Deserialize the datetime string back into a datetime object
+    deserialized_dt = _convert_task_param(
+        ParamDef(
+            arg_name="required",
+            slug="required",
+            name="Required",
+            type="datetime",
+            description="",
+            default=None,
+            multi=False,
+            required=True,
+            options=None,
+            regex=None,
+        ),
+        serialized_dt,
+    )
+    assert deserialized_dt.tzinfo is not None
+    assert deserialized_dt == dt
