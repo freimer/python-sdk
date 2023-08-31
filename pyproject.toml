@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "airplanesdk"
-version = "0.3.37"
+version = "0.3.38"
 description = "A Python SDK for writing Airplane tasks"
 authors = ["Airplane <support@airplane.dev>"]
 license = "MIT"
@@ -12,7 +12,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.7.2"
+python = "^3.8.0"
 requests = "^2.25.1"
 backoff = "^2.2.1"
 deprecation = "^2.1.0"
@@ -26,9 +26,9 @@ openai = "^0.27.7"
 
 [tool.poetry.dev-dependencies]
 pre-commit = "2.21.0"
-black = "23.3.0"
-pylint = "2.17.4"
-mypy = "1.4.1"
+black = "23.7.0"
+pylint = "2.17.5"
+mypy = "1.5.1"
 typed-ast = "^1.5.4"
 types-requests = "^2.27.29"
 pytest = "7.4.0"

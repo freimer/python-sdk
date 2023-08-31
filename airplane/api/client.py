@@ -153,6 +153,7 @@ class APIClient:
             body={
                 "paramValues": serialized_param_values,
                 "constraintParams": pick_zone_resp["constraintParams"],
+                "parameters": pick_zone_resp["parameters"],
             },
             extra_headers={"X-Airplane-Dataplane-Token": zone["accessToken"]},
             host=zone["dataPlaneURL"],
@@ -165,13 +166,7 @@ class APIClient:
             body={
                 "slug": slug,
                 "paramValues": {
-                    # TODO: this substitution conditional is temporary
-                    key: (
-                        val
-                        if key not in pick_zone_resp["constraintParams"]
-                        else serialized_param_values[key]
-                    )
-                    for key, val in agent_resp["substitutions"].items()
+                    agent_resp["substituteValues"],
                 },
                 "resources": resources or {},
                 "inputsZoneID": zone["id"],
