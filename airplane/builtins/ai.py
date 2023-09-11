@@ -82,7 +82,6 @@ class ChatBot:
         model: Optional[str] = None,
         temperature: Optional[float] = None,
     ) -> None:
-
         self.history = [
             Message(
                 role="system",

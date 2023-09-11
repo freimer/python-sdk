@@ -133,7 +133,7 @@ def test_header_matcher() -> None:
         ),
         ({"String": "hello"}, False, 'Expected header "Regex" to be set.'),
     ]
-    for (headers, valid, reason) in cases:
+    for headers, valid, reason in cases:
         req = PreparedRequest()
         req.headers = CaseInsensitiveDict(headers)
         assert (valid, reason) == matcher(req)
